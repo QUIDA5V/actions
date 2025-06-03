@@ -1,14 +1,20 @@
 name: "Build and push to docker repo"
 description: "Create a docker image and push to docker repo"
 inputs:
-  docker_username:
-    description: "username of docker account"
+  gcp_sa_key:
+    description: "key"
     required: true
-  docker_password:
-    description: "password of docker account"
+  gcp_project_id:
+    description: "project id"
     required: true
-  repository_name:
-    description: "name of the repository"
+  docker_registry:
+    description: "docker registry"
+    required: true
+  repository_url:
+    description: "url of the repository"
+    required: true
+  image_name:
+    description: "name of the image"
     required: true
   tag:
     description: "tag of the image"
@@ -17,16 +23,22 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
+    - name: Google Cloud Auth
+      uses: "google-github-actions/auth@v2"
       with:
-        username: ${{ inputs.docker_username }}
-        password: ${{ inputs.docker_password }}
+        credentials_json: "${{ inputs.gcp_sa_key }}"
+        project_id: ${{ inputs.gcp_project_id }}
 
-    - name: Build and Push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: Dockerfile
-        push: true
-        tags: ${{ inputs.docker_username }}/${{ inputs.repository_name }}:${{ inputs.tag }}
+    - name: Set up Cloud SDK
+      uses: "google-github-actions/setup-gcloud@v2"
+
+    - name: Configure Docker
+      shell: bash
+      run: |
+        gcloud auth configure-docker ${{ inputs.docker_registry }}
+
+    - name: Build and Push Docker Image
+      shell: bash
+      run: |
+        docker build -t  ${{ inputs.repository_url }}/${{ inputs.image_name }}:${{ inputs.tag }} -f Dockerfile .
+        docker push  ${{ inputs.repository_url }}/${{ inputs.image_name }}:${{ inputs.tag }}
